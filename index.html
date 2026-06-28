@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Глобальный Веб-Чат</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        body { background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        .chat-container { width: 450px; height: 600px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { background: #24292e; color: white; padding: 15px; font-weight: bold; text-align: center; display: flex; justify-content: space-between; align-items: center; }
+        .status { font-size: 0.8rem; padding: 4px 8px; border-radius: 10px; background: #28a745; }
+        .status.offline { background: #dc3545; }
+        
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f7f9fa; }
+        
+        .message { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 0.95rem; line-height: 1.4; position: relative; }
+        .message .username { font-weight: bold; font-size: 0.75rem; block-size: 15px; color: #586069; margin-bottom: 2px; display: block; }
+        
+        .message.sent { background-color: #0084ff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .message.sent .username { color: #b3dbff; }
+        
+        .message.received { background-color: #e4e6eb; color: black; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        .setup-area { display: flex; padding: 10px; gap: 5px; border-bottom: 1px solid #e4e6eb; background: #fff; }
+        .chat-input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #e4e6eb; }
+        
+        input { padding: 10px 15px; border: 1px solid #ccd0d5; border-radius: 20px; outline: none; font-size: 0.95rem; }
+        .nickname-input { width: 120px; }
+        .message-input { flex: 1; }
+        
+        button { background: #0084ff; color: white; border: none; padding: 0 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #006dd1; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <span>Глобальный Чат</span>
+        <span id="status" class="status offline">Подключение...</span>
+    </div>
+    
+    <!-- Поле выбора никнейма -->
+    <div class="setup-area">
+        <input type="text" id="nicknameInput" class="nickname-input" placeholder="Ваш ник..." value="Пользователь">
+        <span style="font-size: 0.8rem; color: #666; align-self: center;">← Измените ник здесь</span>
+    </div>
+    
+    <div class="chat-messages" id="chatMessages"></div>
+    
+    <div class="chat-input-area">
+        <input type="text" id="chatInput" class="message-input" placeholder="Напишите в глобальный чат..." autocomplete="off">
+        <button id="sendBtn" style="margin-left: 5px;">Отправить</button>
+    </div>
+</div>
+
+<script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusEl = document.getElementById('status');
+
+    // Подключаемся к бесплатному публичному эхо-серверу WebSockets
+    // Внимание: так как сервер публичный, данные видят все, кто к нему подключен!
+    const socket = new WebSocket('wss://socketsbay.com/wss/v2/1/demo/');
+
+    // Когда соединение установлено
+    socket.onopen = () => {
+        statusEl.textContent = 'В сети';
+        statusEl.classList.remove('offline');
+    };
+
+    // Когда соединение закрылось
+    socket.onclose = () => {
+        statusEl.textContent = 'Офлайн';
+        statusEl.classList.add('offline');
+    };
+
+    // Когда приходит сообщение от сервера (от другого пользователя)
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            // Проверяем, что структура данных правильная
+            if (data.username && data.text) {
+                displayMessage(data.username, data.text, false);
+            }
+        } catch (e) {
+            // Игнорируем сообщения от других приложений на этом же демо-сервере
+        }
+    };
+
+    function sendMessage() {
+        const text = chatInput.value.trim();
+        const username = nicknameInput.value.trim() || 'Аноним';
+        if (text === '') return;
+
+        const messageData = { username: username, text: text };
+
+        // 1. Отправляем объект в виде строки на сервер
+        socket.send(JSON.stringify(messageData));
+
+        // 2. Отображаем у себя на экране как "отправленное"
+        displayMessage(username, text, true);
+
+        chatInput.value = '';
+    }
+
+    function displayMessage(username, text, isMyMessage) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message');
+        msgDiv.classList.add(isMyMessage ? 'sent' : 'received');
+
+        // Добавляем имя автора сообщения
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('username');
+        nameSpan.textContent = username;
+        
+        const textNode = document.createTextNode(text);
+
+        msgDiv.appendChild(nameSpan);
+        msgDiv.appendChild(textNode);
+        chatMessages.appendChild(msgDiv);
+
+        // Авто-скролл вниз
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+</body>
+</html>
