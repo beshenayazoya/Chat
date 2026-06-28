@@ -99,40 +99,56 @@ function connectWS() {
 }
 
 function sendMessage() {
-    const text = chatInput.value.trim();
-    const username = nicknameInput.value.trim() || 'Аноним';
-    
-    // Проверяем, что сокет готов к отправке
-    if (text === '' || !socket || socket.readyState !== WebSocket.OPEN) return;
+        const text = chatInput.value.trim();
+        const username = nicknameInput.value.trim() || 'Аноним';
+        if (text === '') return;
 
-    const messageData = { username: username, text: text };
-    socket.send(JSON.stringify(messageData));
-    
-    displayMessage(username, text, true);
-    chatInput.value = '';
-}
+        const messageData = { username: username, text: text };
 
-function displayMessage(username, text, isMyMessage) {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('message', isMyMessage ? 'sent' : 'received');
+        // ОТСЮДА УБРАЛИ ручную отрисовку displayMessage(..., true)
+        // Теперь мы просто отправляем данные на сервер
+        socket.send(JSON.stringify(messageData));
 
-    const nameSpan = document.createElement('span');
-    nameSpan.classList.add('username');
-    nameSpan.textContent = username;
-    
-    const textNode = document.createTextNode(text);
+        chatInput.value = '';
+    }
 
-    msgDiv.appendChild(nameSpan);
-    msgDiv.appendChild(textNode);
-    chatMessages.appendChild(msgDiv);
+    // Изменили логику: теперь функция сама решает, синее сообщение или серое,
+    // сравнивая ник автора с тем ником, который прямо сейчас введен в поле "Ваш ник"
+    function displayMessage(username, text) {
+        const myCurrentNickname = nicknameInput.value.trim() || 'Аноним';
+        
+        // Если имя автора совпадает с моим ником — это МОЁ сообщение (синее)
+        const isMyMessage = (username === myCurrentNickname);
 
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message');
+        msgDiv.classList.add(isMyMessage ? 'sent' : 'received');
 
-sendBtn.addEventListener('click', sendMessage);
-chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('username');
+        nameSpan.textContent = username;
+        
+        const textNode = document.createTextNode(text);
+
+        msgDiv.appendChild(nameSpan);
+        msgDiv.appendChild(textNode);
+        chatMessages.appendChild(msgDiv);
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // И самое главное: когда сервер возвращает сообщение, мы его просто отрисовываем
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.username && data.text) {
+                // Вызываем обновленную функцию
+                displayMessage(data.username, data.text);
+            }
+        } catch (e) {
+            // Игнорируем чужой мусор с публичного сервера
+        }
+    };
 
 // Запускаем первое подключение
 connectWS();
