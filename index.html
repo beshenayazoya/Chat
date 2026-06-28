@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Глобальный Веб-Чат</title>
+    <title>Чат Симулятор Камня</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
         body { background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -56,68 +56,55 @@
     </div>
 </div>
 
-<script>    
-const chatMessages = document.getElementById('chatMessages');
-const chatInput = document.getElementById('chatInput');
-const nicknameInput = document.getElementById('nicknameInput');
-const sendBtn = document.getElementById('sendBtn');
-const statusEl = document.getElementById('status');
 
-let socket;
+<script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusEl = document.getElementById('status');
 
-function connectWS() {
-    // Создаем подключение (УБЕДИСЬ, ЧТО АДРЕС ТВОЙ И БЕЗ ЛИШНИХ СЛЭШЕЙ)
-    const socket = new WebSocket('wss://chat-uqlc.onrender.com/');
+    // ТВОЙ АДРЕС С RENDER (Вставь его сюда вместо текста ниже)
+    const SERVER_URL = 'wss://твой-уникальный-адрес.onrender.com';
 
+    // 1. Создаем подключение
+    const socket = new WebSocket(SERVER_URL);
+
+    // 2. Настраиваем события подключения
     socket.onopen = () => {
         statusEl.textContent = 'В сети';
         statusEl.classList.remove('offline');
-        console.log('Успешно подключено к серверу!');
     };
 
     socket.onclose = () => {
-        statusEl.textContent = 'Офлайн (Переподключение...)';
+        statusEl.textContent = 'Офлайн';
         statusEl.classList.add('offline');
-        // Если сервер упал или спал, пробуем подключиться снова через 3 секунды
-        setTimeout(connectWS, 3000);
-    };
-
-    socket.onerror = (error) => {
-        console.error('Ошибка сокета:', error);
     };
 
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
             if (data.username && data.text) {
-                displayMessage(data.username, data.text, false);
+                displayMessage(data.username, data.text);
             }
         } catch (e) {
             console.log('Получены не JSON данные:', event.data);
         }
     };
-}
 
-function sendMessage() {
+    // 3. Функции для работы чата
+    function sendMessage() {
         const text = chatInput.value.trim();
         const username = nicknameInput.value.trim() || 'Аноним';
         if (text === '') return;
 
         const messageData = { username: username, text: text };
-
-        // ОТСЮДА УБРАЛИ ручную отрисовку displayMessage(..., true)
-        // Теперь мы просто отправляем данные на сервер
         socket.send(JSON.stringify(messageData));
-
         chatInput.value = '';
     }
 
-    // Изменили логику: теперь функция сама решает, синее сообщение или серое,
-    // сравнивая ник автора с тем ником, который прямо сейчас введен в поле "Ваш ник"
     function displayMessage(username, text) {
         const myCurrentNickname = nicknameInput.value.trim() || 'Аноним';
-        
-        // Если имя автора совпадает с моим ником — это МОЁ сообщение (синее)
         const isMyMessage = (username === myCurrentNickname);
 
         const msgDiv = document.createElement('div');
@@ -137,21 +124,11 @@ function sendMessage() {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // И самое главное: когда сервер возвращает сообщение, мы его просто отрисовываем
-    socket.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            if (data.username && data.text) {
-                // Вызываем обновленную функцию
-                displayMessage(data.username, data.text);
-            }
-        } catch (e) {
-            // Игнорируем чужой мусор с публичного сервера
-        }
-    };
-
-// Запускаем первое подключение
-connectWS();
+    // 4. Слушатели кнопок
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
 </script>
 
 </body>
