@@ -56,82 +56,86 @@
     </div>
 </div>
 
-<script>
-    const chatMessages = document.getElementById('chatMessages');
-    const chatInput = document.getElementById('chatInput');
-    const nicknameInput = document.getElementById('nicknameInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const statusEl = document.getElementById('status');
+<script>    
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const nicknameInput = document.getElementById('nicknameInput');
+const sendBtn = document.getElementById('sendBtn');
+const statusEl = document.getElementById('status');
 
-    // Подключаемся к бесплатному публичному эхо-серверу WebSockets
-    // Внимание: так как сервер публичный, данные видят все, кто к нему подключен!
-    const socket = new WebSocket('wss://chat-uqlc.onrender.com');
+let socket;
 
-    // Когда соединение установлено
+function connectWS() {
+    // Создаем подключение (УБЕДИСЬ, ЧТО АДРЕС ТВОЙ И БЕЗ ЛИШНИХ СЛЭШЕЙ)
+    socket = new WebSocket('wss://chat-uqlc.onrender.com');
+
     socket.onopen = () => {
         statusEl.textContent = 'В сети';
         statusEl.classList.remove('offline');
+        console.log('Успешно подключено к серверу!');
     };
 
-    // Когда соединение закрылось
     socket.onclose = () => {
-        statusEl.textContent = 'Офлайн';
+        statusEl.textContent = 'Офлайн (Переподключение...)';
         statusEl.classList.add('offline');
+        // Если сервер упал или спал, пробуем подключиться снова через 3 секунды
+        setTimeout(connectWS, 3000);
     };
 
-    // Когда приходит сообщение от сервера (от другого пользователя)
+    socket.onerror = (error) => {
+        console.error('Ошибка сокета:', error);
+    };
+
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            // Проверяем, что структура данных правильная
             if (data.username && data.text) {
                 displayMessage(data.username, data.text, false);
             }
         } catch (e) {
-            // Игнорируем сообщения от других приложений на этом же демо-сервере
+            console.log('Получены не JSON данные:', event.data);
         }
     };
+}
 
-    function sendMessage() {
-        const text = chatInput.value.trim();
-        const username = nicknameInput.value.trim() || 'Аноним';
-        if (text === '') return;
+function sendMessage() {
+    const text = chatInput.value.trim();
+    const username = nicknameInput.value.trim() || 'Аноним';
+    
+    // Проверяем, что сокет готов к отправке
+    if (text === '' || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-        const messageData = { username: username, text: text };
+    const messageData = { username: username, text: text };
+    socket.send(JSON.stringify(messageData));
+    
+    displayMessage(username, text, true);
+    chatInput.value = '';
+}
 
-        // 1. Отправляем объект в виде строки на сервер
-        socket.send(JSON.stringify(messageData));
+function displayMessage(username, text, isMyMessage) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('message', isMyMessage ? 'sent' : 'received');
 
-        // 2. Отображаем у себя на экране как "отправленное"
-        displayMessage(username, text, true);
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('username');
+    nameSpan.textContent = username;
+    
+    const textNode = document.createTextNode(text);
 
-        chatInput.value = '';
-    }
+    msgDiv.appendChild(nameSpan);
+    msgDiv.appendChild(textNode);
+    chatMessages.appendChild(msgDiv);
 
-    function displayMessage(username, text, isMyMessage) {
-        const msgDiv = document.createElement('div');
-        msgDiv.classList.add('message');
-        msgDiv.classList.add(isMyMessage ? 'sent' : 'received');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
-        // Добавляем имя автора сообщения
-        const nameSpan = document.createElement('span');
-        nameSpan.classList.add('username');
-        nameSpan.textContent = username;
-        
-        const textNode = document.createTextNode(text);
+sendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
 
-        msgDiv.appendChild(nameSpan);
-        msgDiv.appendChild(textNode);
-        chatMessages.appendChild(msgDiv);
-
-        // Авто-скролл вниз
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
+// Запускаем первое подключение
+connectWS();
 </script>
 
 </body>
