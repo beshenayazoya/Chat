@@ -67,7 +67,7 @@ let socket;
 
 function connectWS() {
     // Создаем подключение (УБЕДИСЬ, ЧТО АДРЕС ТВОЙ И БЕЗ ЛИШНИХ СЛЭШЕЙ)
-    socket = new WebSocket('wss://my-global-chat.onrender.com');
+    socket = new WebSocket('wss://chat-uqlc.onrender.com/');
 
     socket.onopen = () => {
         statusEl.textContent = 'В сети';
